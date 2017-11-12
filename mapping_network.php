@@ -56,9 +56,9 @@ function getLocalIp(){
 	return getHostByName(getHostName());
 }
 
-function getIp(){
+function getIp($filename){
 	//ouverture de fichiers
-	$CaptureOrig = fopen('Capture.txt', 'r');
+	$CaptureOrig = fopen('Captures/'. $filename, 'r');
 	$CaptureTri = fopen("NetworkData1.txt", "a");
 	file_put_contents('NetworkData1.txt', '');//Efface contenu du fichier si déjà rempli
 	
@@ -89,7 +89,8 @@ return $Ip;
 
 function getIpSrc($Ip) {
 $IpSrc =array();
-
+//comptage du nombre d'occurences de chaque ip source
+	$nombreOccurences = array();
 	foreach ($Ip as $key => $ligneIp){
 		//si l'adresse ip source existe dans le tableau des IP source :
 		if (array_key_exists($ligneIp[0], $IpSrc)){
@@ -97,37 +98,46 @@ $IpSrc =array();
 			if (!in_array($ligneIp[1], $IpSrc[$ligneIp[0]])){
 				//ajout à la liste des IP de cette source
 				$IpSrc[$ligneIp[0]][] = $ligneIp[1];
+				//maj du compteur
+				$nombreOccurences[$ligneIp[0]] = $nombreOccurences[$ligneIp[0]] + 1;
 			}
 		}else{
 			//ajout d'une nouvelle ip
 			$IpSrc[$ligneIp[0]]= [$ligneIp[1]];
+			$nombreOccurences[$ligneIp[0]] = 1;
 		}
 	}
-	return $IpSrc;
+	$ipSourceLocale = array_search(max($nombreOccurences),$nombreOccurences);
+	$selection = array();
+	$selection[$ipSourceLocale] = $IpSrc[$ipSourceLocale]; 
+	return $selection;
 }
 
 function getIpExport($IpSrc){
 	//conversion array php -> array compatible graphe JS
 	$IpExport = array();
 	//pour chaque source de la liste
-	foreach ($IpSrc as $key => $ligneIpSrc){
-		$cpt = 0; //compteur
-		$ajout = null;
-		//pour chaque destination
-		foreach ($ligneIpSrc as $key2 => $children){
-			//si premier passage -> creation complete
-			if ($cpt == 0){
-				$ajout=array('name' =>$key, 'children' => array());
-				$ajout['children'][]=array('name' => $children, 'size' => 10000);
-			}else{
-				//sinon mise à jour
-				$ajout['children'][]=array('name' => $children, 'size' => 10000);
-			}	
-			//sinon -> ajout aux childrens
-			$cpt++;
+	forEach($IpSrc as $IpSrcUnit){
+		foreach ($IpSrcUnit as $key => $ligneIpSrc){
+			$cpt = 0; //compteur
+			$ajout = null;
+			//pour chaque destination
+			foreach ($ligneIpSrc as $key2 => $children){
+				//si premier passage -> creation complete
+				if ($cpt == 0){
+					$ajout=array('name' =>$key, 'children' => array());
+					$ajout['children'][]=array('name' => $children, 'size' => 10000);
+				}else{
+					//sinon mise à jour
+					$ajout['children'][]=array('name' => $children, 'size' => 10000);
+				}	
+				//sinon -> ajout aux childrens
+				$cpt++;
+			}
+			$IpExport[]=$ajout;
 		}
-		$IpExport[]=$ajout;
 	}
+	
 	return (json_encode($IpExport));
 	
 }
@@ -141,27 +151,36 @@ function setSelect($IpSrc){
 	<?php
 	
 	//sert à afficher toutes les ip en option
-	/*
-	forEach($IpSrc as $key => $element){
-		if($key==$_SESSION['IpLocale'])
-		{
-		?>
-		<option value="<?php print $key; ?>" > <?php print $key; ?> </option>
-		<?php
+	
+	forEach($IpSrc as $key => $IpSrcUnit){
+		forEach($IpSrcUnit as $key => $element){
+			//ne pas ajouter l'ip locale, elle est deja ajoutée par defaut ci dessus
+			if ($key !== getLocalIp()){
+			?>
+			<option value="<?php print $key; ?>" > <?php print $key; ?> </option>
+			<?php
+			}
+			
 		}
 	}
-	*/
+	
 }
 
-//récuperation de la liste des ip source/destination contenues dans le fichier source
-$Ip = getIp();
-//tri des ip par source
-$IPSrc = getIpSrc($Ip);
-//exportation vers un array comptablie avec les graphes
+//liste des captures dans le dossier d'entree
+$listeDeCaptures = scandir('captures');
+		$IPSrc = array();
+foreach ($listeDeCaptures as $key => $file){
+	if ($file !== '.' && $file !== '..'){
+		//récuperation de la liste des ip source/destination contenues dans le fichier source
+		$Ip = getIp($file);
+		//tri des ip par source
+		$IPSrc[] = getIpSrc($Ip);
+		
+	}
+}
+
 $IpExport = getIpExport($IPSrc);
 setSelect($IPSrc);
-
-
 
 ?>
 <!-- Fin de Récupération ip source et ip adresse -->
@@ -211,6 +230,7 @@ $( document ).ready(function() {
 //recuperation de l'export PHP -> JSON
 var tableau = <?php echo $IpExport ?>; //tableau JSON -> js
 
+
 //creation de l'objet root du graphe
 var root = {
 	name:"graphe de test", //nom du noeud principal
@@ -218,9 +238,6 @@ var root = {
 	};
 	
 var rootBackup = root;
-
-//console.log('root genéré : ');
-//console.log(root);
 
 //variables par defaut
 var width = 960,
