@@ -36,11 +36,13 @@ label {
 <head>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script src="//d3js.org/d3.v3.min.js"></script>
+
 </head>
 
 <header>
   <div class="column">
       <h1>Graphe des IP source et destination</h1>
+	  <?php echo "Votre Ip locale est " . getLocalIp() ?>
 	  <p> Choisir une ip source </p>
 	  
      </div>
@@ -49,6 +51,10 @@ label {
 
 <!-- Récupération ip source et ip adresse -->
 <?php
+
+function getLocalIp(){
+	return getHostByName(getHostName());
+}
 
 function getIp(){
 	//ouverture de fichiers
@@ -130,14 +136,21 @@ function setSelect($IpSrc){
 	//ajout des options
 	?> 
 	<select id="select">
-	<option value="" disabled selected>Choisir une ip</option>
+	<option value="<?php print getLocalIp(); ?>" > <?php print getLocalIp(); ?> </option>
 	<option value="TOUTES">TOUTES</option>
 	<?php
+	
+	//sert à afficher toutes les ip en option
+	/*
 	forEach($IpSrc as $key => $element){
+		if($key==$_SESSION['IpLocale'])
+		{
 		?>
 		<option value="<?php print $key; ?>" > <?php print $key; ?> </option>
 		<?php
+		}
 	}
+	*/
 }
 
 //récuperation de la liste des ip source/destination contenues dans le fichier source
@@ -188,6 +201,11 @@ $('#select').change(function(){
 			}
 		});
 	}
+});
+
+//lancement du .change du select au demarrage
+$( document ).ready(function() {
+    $('#select').change();
 });
 
 //recuperation de l'export PHP -> JSON
